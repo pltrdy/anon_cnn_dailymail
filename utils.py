@@ -21,11 +21,13 @@ def warning(*args, **kwargs):
 
 def fix_missing_period(line):
     """Adds a period to a line that is missing a period"""
-    """credits: https://github.com/abisee/cnn-dailymail/blob/master/make_datafiles.py"""
+    """ credits:
+    https://github.com/abisee/cnn-dailymail/blob/master/make_datafiles.py"""
     dm_single_close_quote = u'\u2019'  # unicode
     dm_double_close_quote = u'\u201d'
+    # acceptable ways to end a sentence
     END_TOKENS = ['.', '!', '?', '...', "'", "`", '"', dm_single_close_quote,
-                  dm_double_close_quote, ")"]  # acceptable ways to end a sentence
+                  dm_double_close_quote, ")"]
 
     if "@highlight" in line:
         return line
@@ -55,9 +57,18 @@ def replace_entity(entity_mapping, text, reverse=True):
         entity_mapping = {v: k for (k, v) in entity_mapping.items()}
 
     pattern = re.compile(r'(^|\s)(' + '|'.join(re.escape(key)
-                                               for key in entity_mapping.keys()) + r')($|\s)')
+                         for key
+                         in entity_mapping.keys()) + r')($|\s)')
 
-    def p(x): return " %s " % entity_mapping["".join(x.group().split())]
+    def p(x):
+        try:
+            r = " %s " % entity_mapping[" ".join(x.group().split())]
+        except KeyError as e:
+            print("KeyError: ", e)
+            print("DEBUG: entity_mapping", entity_mapping)
+            raise e
+        else:
+            return r
     result = pattern.sub(p, text)
     result = " ".join(result.split())
     return result

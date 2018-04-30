@@ -1,12 +1,16 @@
 #!/usr/bin/env python
 import os
-import re
-from utils import hashhex, warning, fix_missing_period, line_to_sentence, replace_entity
+from utils import hashhex, warning, line_to_sentence, \
+                  replace_entity
 
 
-def tokenize_dir(src_dir, dst_dir, tokenizer_mapping_path="./tok_mapping.txt"):
+def tokenize_dir(src_dir, dst_dir, corenlp_path="./stanford-corenlp",
+                 tokenizer_mapping_path="./tok_mapping.txt"):
     """Tokenzie each files of root/dirname to root/"tok_"+dirname
+       It also write the mapping "src_file \t tok_file" (1 per line)
+       in tokenizer_mapping_path
     """
+    corenlp_path = os.path.abspath(corenlp_path)
     print("Tokenizing directory:\n\t* src: %s\n\t* dst: %s\n\t* map file: %s"
           % (src_dir, dst_dir, tokenizer_mapping_path))
     with open(tokenizer_mapping_path, "w") as f:
@@ -44,7 +48,7 @@ def process_set(question_filenames, stories_root, output_root):
     """Process a set of question filenames.
        For each question file:
         * reads the associated story files
-        * retag entities (per document notation); 
+        * retag entities (per document notation);
         * fixes some stuff (whitespace, case)
         * outputs story, highlight and entities in three files:
             output_root/<hash>.{story, highlight, entities}
@@ -54,7 +58,7 @@ def process_set(question_filenames, stories_root, output_root):
 
     stories_out = open(os.path.join(output_root, "stories"), "w")
     highlights_out = open(os.path.join(output_root, "highlights"), "w")
-    filelist_out = open(os.path.join(output_root, "files"), "w")
+    entitylist_out = open(os.path.join(output_root, "entities"), "w")
 
     print(stories_root)
     print("%d stories" % (n_stories))
@@ -64,11 +68,7 @@ def process_set(question_filenames, stories_root, output_root):
             if len(processed_hashes) == n_stories:
                 break
 
-            try:
-                line = f.readline().replace("\n", "")
-            except:
-                warning("[WARNING] Empty file %s" % filename)
-                continue
+            line = f.readline().replace("\n", "")
 
             # looking for corresponding story
             b_url = line.encode("utf-8")
@@ -81,19 +81,18 @@ def process_set(question_filenames, stories_root, output_root):
             story_name = "%s.story" % h
             story_path = os.path.join(stories_root, story_name)
             if not os.path.isfile(story_path):
-                warning("[WARNING] No story file:\n\t\t%s\nfor question:\t%s" % (
-                    story_path, filename))
+                warning("[WARNING] No story file:\n\t\t%s\nfor question:\t%s"
+                        % (story_path, filename))
                 continue
 
             lines = f.readlines()
 
             # here, qstory contains tokenzied, anonymous, stories
-            qstory = lines[1]
-            qquestion = lines[3]
-            qanswer = lines[5]
+            # qstory = lines[1]
+            # qquestion = lines[3]
+            # qanswer = lines[5]
             qentities = lines[7:]
-
-            nentities = len(qentities)
+            # nentities = len(qentities)
 
             # {new_tag: value}
             entity_new_mapping = {}
@@ -128,29 +127,23 @@ def process_set(question_filenames, stories_root, output_root):
                         bullets += [line]
                     next_highlight = False
 
-            #ref_story_path = os.path.join(output_root, "%s.ref" % h)
-            # with open(ref_story_path, 'w') as out_ref:
-            #    story = replace_entity(entity_remapping, qstory)
-            #    out_ref.write(story)
-
             story = process_lines(bullets, entity_new_mapping)
-            stories_out.write(story+"\n")
+            stories_out.write(story + "\n")
 
             highlight = process_lines(highlights, entity_new_mapping)
-            highlights_out.write(highlight+"\n")
+            highlights_out.write(highlight + "\n")
 
-            filelist_out.write(h)
+            entitylist_out.write(h + "\n")
 
             entities_path = os.path.join(output_root, "%s.entities" % h)
             with open(entities_path, 'w') as out_entities:
                 entities = "\n".join(["%s:%s" % (k, v)
-                                      for (k, v) in entity_new_mapping.items()])
+                                      for (k, v)
+                                      in entity_new_mapping.items()])
                 out_entities.write(entities)
 
 
 def _process(questions_root, stories_root, output_root):
-    processed_story = []
-    questions_files = {}
     for dataset in ["training", "validation", "test"]:
         dataset_root = os.path.join(questions_root, dataset)
         filenames = [os.path.join(questions_root, dataset, _filename)
@@ -163,9 +156,8 @@ def _process(questions_root, stories_root, output_root):
         # run for f in *.story; do echo "$f" >> train.story; done
 
 
-def main(skip_tokenizer=False):
-    dataset_root = "/home/pltrdy/cnndm4"
-    output_root = "/home/pltrdy/cnndm4/processed"
+def main(dataset_root, output_root, corenlp_path="./stanford-corenlp",
+         skip_tokenizer=False):
     os.makedirs(output_root, exist_ok=True)
 
     for dataset in ["cnn", "dailymail"]:
@@ -179,7 +171,7 @@ def main(skip_tokenizer=False):
         if not skip_tokenizer:
             os.makedirs(tok_stories_root, exist_ok=True)
             tokmap = os.path.join(output_root, "tokmap_%s_story.txt" % dataset)
-            tokenize_dir(stories_root, tok_stories_root, tokmap)
+            tokenize_dir(stories_root, tok_stories_root, corenlp_path, tokmap)
 
         _process(questions, tok_stories_root, output_root)
 
@@ -189,6 +181,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description='Process CNN/DailyMail dataset')
     parser.add_argument("--skip_tokenizer", action="store_true")
+    parser.add_argument("--dataset_dir", "-d", required=True,
+                        help="Dataset directory")
+    parser.add_argument("--output_dir", "-o", required=True,
+                        help="Output directory")
+    parser.add_argument("--corenlp_dir", "-c", default="./stanford-corenlp",
+                        help="Stanford CoreNLP tools directory")
     args = parser.parse_args()
 
-    main(skip_tokenizer=args.skip_tokenizer)
+    main(args.dataset_dir, args.output_dir, args.corenlp_dir,
+         skip_tokenizer=args.skip_tokenizer)

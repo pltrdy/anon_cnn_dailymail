@@ -7,10 +7,10 @@ def main(args):
     def remove_eol(line):
         return line.replace("\n", "")
 
-    print(args)
+    # print(args)
 
     f = open(args.file)
-    fl = open(args.file_list)
+    fl = open(args.entities_file_list)
     out = open(args.output, 'w')
     count = 0
     while True:
@@ -33,15 +33,14 @@ def main(args):
 
         text = remove_eol(text)
         entity_filename = remove_eol(entity_filename)
-        entity_path = os.path.join(args.dir, "%s.entities" % entity_filename)
+        entity_path = os.path.join(args.entities_dir, "%s.entities"
+                                   % entity_filename)
         entity_mapping = {}
+
         with open(entity_path) as entities:
             for entity_line in entities:
                 parts = remove_eol(entity_line).split(":")
                 tag = parts[0]
-                # TODO when process if fixed it may be some : in tags
-                # use code below
-                # value = " : ".join(parts[1:])
                 value = " ".join(parts[1:])
                 entity_mapping[tag] = value
 
@@ -55,9 +54,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description='Replace entity tags by words')
     parser.add_argument("-f", "--file", help="Text file", required=True)
-    parser.add_argument("-fl", "--file_list",
+    parser.add_argument("-fl", "--entities_file_list",
                         help="Entity files list", required=True)
-    parser.add_argument("-d", "--dir", help="Entity files dir", required=True)
+    parser.add_argument("-d", "--entities_dir", required=True,
+                        help="Entity files dir")
     parser.add_argument("-o", "--output", help="Output file", required=True)
     args = parser.parse_args()
 
